@@ -1,0 +1,10 @@
+{
+    "u": "itf.test@noctelecom.uz",
+    "p": "Itf.t3$t",
+    "ftp": {
+        "host": "10.15.135.45",
+        "port": 21111,
+        "user": "Alarm",
+        "pass": "Alm_123!"
+    }
+}
