@@ -457,11 +457,11 @@ def generate_sms_text(df_sms_input):
 def process_session_data(session):
     """ Скачивание и обработка файла с портала """
     try:
-        print(">>> [SYNC] Скачивание файла...")
+        print(flush=True, ">>> [SYNC] Скачивание файла...")
         res = session.get(f"{BASE_URL}/Bts/ExportAuditToExcel", timeout=120, verify=False)
 
         if b"<!DOCTYPE html>" in res.content[:100]:
-            print(">>> [ERROR] Вместо Excel пришел HTML. Сессия сброшена.")
+            print(flush=True, ">>> [ERROR] Вместо Excel пришел HTML. Сессия сброшена.")
             if os.path.exists(COOKIE_FILE): os.remove(COOKIE_FILE)
             return False
 
@@ -632,7 +632,7 @@ def process_session_data(session):
 
         data_store['combined_sms'] = generate_sms_text(pd.concat(sms_frames) if sms_frames else pd.DataFrame())
         data_store['last_sync_dt'] = datetime.now()
-        print(">>> [SYNC] Данные успешно обновлены.")
+        print(flush=True, ">>> [SYNC] Данные успешно обновлены.")
         return True
 
     except:
@@ -643,7 +643,7 @@ def process_session_data(session):
 def fetch_and_sync_all():
     try:
         if not os.path.exists(CONFIG_FILE):
-            print(">>> [ERROR] user_config.json не найден")
+            print(flush=True, ">>> [ERROR] user_config.json не найден")
             return False
         with open(CONFIG_FILE, "r") as f:
             creds = json.load(f)
@@ -657,37 +657,37 @@ def fetch_and_sync_all():
                     session.cookies.update(pickle.load(f))
                 test_res = session.get(f"{BASE_URL}/Bts", verify=False, timeout=15)
                 if test_res.status_code == 200 and "/Account/Login" not in test_res.url:
-                    print(">>> [SESSION] COOKIE VALID.")
+                    print(flush=True, ">>> [SESSION] COOKIE VALID.")
                     return process_session_data(session)
             except:
                 pass
 
         # 2. Login
-        print(">>> [LOGIN] Пробуем вход по логину/паролю...")
+        print(flush=True, ">>> [LOGIN] Пробуем вход по логину/паролю...")
         resp = session.get(f"{BASE_URL}/Account/Login", verify=False)
         token_input = BeautifulSoup(resp.content, 'html.parser').find('input', {'name': '__RequestVerificationToken'})
         if not token_input:
-            print(">>> [ERROR] Token not found")
+            print(flush=True, ">>> [ERROR] Token not found")
             return False
 
         token_l = token_input['value']
-        print(f">>> [DEBUG] Логин: {creds['u']}, Token: {token_l[:30]}...")
+        print(flush=True, f">>> [DEBUG] Логин: {creds['u']}, Token: {token_l[:30]}...")
 
         login_data = {'LoginInput': creds['u'], 'Password': creds['p'], '__RequestVerificationToken': token_l}
         res_l = session.post(f"{BASE_URL}/Account/Login", data=login_data, verify=False, allow_redirects=True)
 
-        print(f">>> [DEBUG] После логина: status={res_l.status_code}, url={res_l.url}")
+        print(flush=True, f">>> [DEBUG] После логина: status={res_l.status_code}, url={res_l.url}")
 
         # 3. 2FA Check
         if "LoginWith2fa" in res_l.url:
-            print(f">>> [SMS] Введите код из SMS, отправленный на ***{creds['u'][-4:]}:")
+            print(flush=True, f">>> [SMS] Введите код из SMS, отправленный на ***{creds['u'][-4:]}:")
             sms_code = input().strip()
 
-            print(f">>> [DEBUG] Введенный код: '{sms_code}', длина: {len(sms_code)}")
+            print(flush=True, f">>> [DEBUG] Введенный код: '{sms_code}', длина: {len(sms_code)}")
 
             # Validate code length
             if len(sms_code) != 6 or not sms_code.isdigit():
-                print(">>> [ERROR] Код должен содержать ровно 6 цифр!")
+                print(flush=True, ">>> [ERROR] Код должен содержать ровно 6 цифр!")
                 return False
 
             # Parse verification token from 2FA page
@@ -695,7 +695,7 @@ def fetch_and_sync_all():
             token_2fa = soup_2fa.find('input', {'name': '__RequestVerificationToken'})
             ver_token = token_2fa['value'] if token_2fa else ""
 
-            print(f">>> [DEBUG] 2FA Token: {ver_token[:30]}...")
+            print(flush=True, f">>> [DEBUG] 2FA Token: {ver_token[:30]}...")
 
             # Submit 2FA code - server expects D1, D2, D3, D4, D5, D6 fields
             submit_data = {
@@ -707,45 +707,45 @@ def fetch_and_sync_all():
                 "D6": sms_code[5],
                 "__RequestVerificationToken": ver_token
             }
-            print(f">>> [DEBUG] Отправляем 2FA на: {BASE_URL}/Account/LoginWith2fa")
-            print(
+            print(flush=True, f">>> [DEBUG] Отправляем 2FA на: {BASE_URL}/Account/LoginWith2fa")
+            print(flush=True, 
                 f">>> [DEBUG] Данные: D1={submit_data['D1']}, D2={submit_data['D2']}, D3={submit_data['D3']}, D4={submit_data['D4']}, D5={submit_data['D5']}, D6={submit_data['D6']}")
 
             res_2fa = session.post(f"{BASE_URL}/Account/LoginWith2fa", data=submit_data, verify=False,
                                    allow_redirects=True)
 
-            print(f">>> [DEBUG] Ответ 2FA: status={res_2fa.status_code}, url={res_2fa.url}")
+            print(flush=True, f">>> [DEBUG] Ответ 2FA: status={res_2fa.status_code}, url={res_2fa.url}")
 
             if "/Account/Login" in res_2fa.url:
-                print(">>> [ERROR] Неверный код или истекло время.")
+                print(flush=True, ">>> [ERROR] Неверный код или истекло время.")
                 # Print error message if any
                 soup_err = BeautifulSoup(res_2fa.content, 'html.parser')
                 err_div = soup_err.find('div', class_='text-danger')
                 if err_div:
-                    print(f">>> [ERROR] Сообщение: {err_div.get_text().strip()}")
+                    print(flush=True, f">>> [ERROR] Сообщение: {err_div.get_text().strip()}")
                 return False
 
-            print(">>> [LOGIN] 2FA успешно. Сохраняем куки.")
+            print(flush=True, ">>> [LOGIN] 2FA успешно. Сохраняем куки.")
             with open(COOKIE_FILE, 'wb') as f:
                 pickle.dump(session.cookies, f)
             return process_session_data(session)
 
         # 4. Success without 2FA?
         if "/Account/Login" in res_l.url:
-            print(f">>> [ERROR] Не удалось войти. URL: {res_l.url}")
+            print(flush=True, f">>> [ERROR] Не удалось войти. URL: {res_l.url}")
             # Print error message from page
             soup_err = BeautifulSoup(res_l.content, 'html.parser')
             err_div = soup_err.find('div', class_='text-danger')
             if err_div:
-                print(f">>> [ERROR] Сообщение от сервера: {err_div.get_text().strip()}")
+                print(flush=True, f">>> [ERROR] Сообщение от сервера: {err_div.get_text().strip()}")
             return False
 
         if res_l.status_code == 200:
-            print(">>> [LOGIN] Вход успешен (200 OK). Сохраняем куки.")
+            print(flush=True, ">>> [LOGIN] Вход успешен (200 OK). Сохраняем куки.")
             with open(COOKIE_FILE, 'wb') as f: pickle.dump(session.cookies, f)
             return process_session_data(session)
 
-        print(f">>> [ERROR] Странный ответ сервера: {res_l.status_code} {res_l.url}")
+        print(flush=True, f">>> [ERROR] Странный ответ сервера: {res_l.status_code} {res_l.url}")
         return False
 
     except Exception as e:
@@ -776,11 +776,11 @@ def index():
             for vk, file_key in [('huawei', 'hw_alarms'), ('zte', 'zte_alarms')]:
                 file = request.files.get(file_key)
                 if not file or file.filename == '':
-                    print(f">>> [ALARM CHECK] No file uploaded for {vk.upper()}")
+                    print(flush=True, f">>> [ALARM CHECK] No file uploaded for {vk.upper()}")
                     continue
 
                 # Clear alarms ONLY for this vendor before processing
-                print(f">>> [ALARM CHECK] Clearing old alarms for {vk.upper()}...")
+                print(flush=True, f">>> [ALARM CHECK] Clearing old alarms for {vk.upper()}...")
                 vendor_ids = data_store['sms_numeric_ids'].get(vk, set())
                 removed_count = 0
                 for num_id in vendor_ids:
@@ -788,48 +788,48 @@ def index():
                     if full_id in data_store['active_alarms']:
                         del data_store['active_alarms'][full_id]
                         removed_count += 1
-                print(f">>> [ALARM CHECK] Cleared {removed_count} alarm entries for {vk.upper()}")
+                print(flush=True, f">>> [ALARM CHECK] Cleared {removed_count} alarm entries for {vk.upper()}")
 
-                print(f"\n>>> [ALARM CHECK] ========== Processing {vk.upper()} file: {file.filename} ==========")
+                print(flush=True, f"\n>>> [ALARM CHECK] ========== Processing {vk.upper()} file: {file.filename} ==========")
 
                 # Extract lookup keys to avoid f-string nesting issues
                 vendor_prefix = 'hw' if vk == 'huawei' else 'zt'
                 id_lookup_key = f"{vendor_prefix}_id"
                 msg_lookup_key = f"{vendor_prefix}_msg"
 
-                print(f">>> [ALARM CHECK] Lookup keys: {id_lookup_key}, {msg_lookup_key}")
-                print(f">>> [ALARM CHECK] Expected ID columns: {COLUMN_LOOKUP[id_lookup_key]}")
-                print(f">>> [ALARM CHECK] Expected MSG columns: {COLUMN_LOOKUP[msg_lookup_key]}")
+                print(flush=True, f">>> [ALARM CHECK] Lookup keys: {id_lookup_key}, {msg_lookup_key}")
+                print(flush=True, f">>> [ALARM CHECK] Expected ID columns: {COLUMN_LOOKUP[id_lookup_key]}")
+                print(flush=True, f">>> [ALARM CHECK] Expected MSG columns: {COLUMN_LOOKUP[msg_lookup_key]}")
 
                 if file.filename.lower().endswith('.zip'):
-                    print(f">>> [ALARM CHECK] Processing ZIP file...")
+                    print(flush=True, f">>> [ALARM CHECK] Processing ZIP file...")
                     with zipfile.ZipFile(file) as z:
                         excel_files = [f for f in z.namelist() if f.lower().endswith(('.xlsx', '.xls'))]
                         if not excel_files:
-                            print(f">>> [ALARM CHECK] No Excel files in ZIP!")
+                            print(flush=True, f">>> [ALARM CHECK] No Excel files in ZIP!")
                             continue
-                        print(f">>> [ALARM CHECK] Found Excel in ZIP: {excel_files[0]}")
+                        print(flush=True, f">>> [ALARM CHECK] Found Excel in ZIP: {excel_files[0]}")
                         with z.open(excel_files[0]) as f_inside:
                             excel_content = f_inside.read()
                 else:
-                    print(f">>> [ALARM CHECK] Processing Excel file directly...")
+                    print(flush=True, f">>> [ALARM CHECK] Processing Excel file directly...")
                     excel_content = file.read()
 
                 # Step 1: Read raw file WITHOUT headers (like FTP Process)
-                print(f">>> [ALARM CHECK] Reading raw file...")
+                print(flush=True, f">>> [ALARM CHECK] Reading raw file...")
                 df_raw = pd.read_excel(BytesIO(excel_content), header=None, engine='openpyxl')
-                print(f">>> [ALARM CHECK] Raw file loaded: {len(df_raw)} rows, {len(df_raw.columns)} columns")
+                print(flush=True, f">>> [ALARM CHECK] Raw file loaded: {len(df_raw)} rows, {len(df_raw.columns)} columns")
 
                 # Show first 5 rows of raw file to inspect structure
-                print(f">>> [ALARM CHECK] First 5 rows of raw file:")
+                print(flush=True, f">>> [ALARM CHECK] First 5 rows of raw file:")
                 for idx in range(min(5, len(df_raw))):
                     row_values = df_raw.iloc[idx].values.tolist()
                     # Show only first 5 values to avoid clutter
-                    print(f"    Row {idx}: {row_values[:5]}")
+                    print(flush=True, f"    Row {idx}: {row_values[:5]}")
 
                 # Find header row - SCAN ALL ROWS (like FTP Process)
                 lookup_cols = COLUMN_LOOKUP[id_lookup_key]
-                print(f">>> [ALARM CHECK] Looking for header containing any of: {lookup_cols}")
+                print(flush=True, f">>> [ALARM CHECK] Looking for header containing any of: {lookup_cols}")
 
                 h_idx = -1
                 for i, row in df_raw.iterrows():
@@ -838,48 +838,48 @@ def index():
                         break
 
                 if h_idx == -1:
-                    print(f">>> [ALARM CHECK] ✗ ERROR: Header not found for {vk.upper()}!")
-                    print(f">>> [ALARM CHECK] File may not be a valid {vk.upper()} alarm export")
+                    print(flush=True, f">>> [ALARM CHECK] ✗ ERROR: Header not found for {vk.upper()}!")
+                    print(flush=True, f">>> [ALARM CHECK] File may not be a valid {vk.upper()} alarm export")
                     continue
 
-                print(f">>> [ALARM CHECK] Vendor: {vk.upper()}, Header index found: {h_idx}")
-                print(f">>> [ALARM CHECK] Header row content: {df_raw.iloc[h_idx].values.tolist()[:10]}")
+                print(flush=True, f">>> [ALARM CHECK] Vendor: {vk.upper()}, Header index found: {h_idx}")
+                print(flush=True, f">>> [ALARM CHECK] Header row content: {df_raw.iloc[h_idx].values.tolist()[:10]}")
 
                 # Step 2: Re-read with correct header (like FTP Process)
-                print(f">>> [ALARM CHECK] Re-reading file with proper headers...")
+                print(flush=True, f">>> [ALARM CHECK] Re-reading file with proper headers...")
                 df = pd.read_excel(BytesIO(excel_content), skiprows=h_idx, engine='openpyxl')
                 df.columns = [str(c).strip() for c in df.columns]
 
-                print(f">>> [ALARM CHECK] Data loaded: {len(df)} rows")
-                print(f">>> [ALARM CHECK] Columns: {list(df.columns)[:10]}")
+                print(flush=True, f">>> [ALARM CHECK] Data loaded: {len(df)} rows")
+                print(flush=True, f">>> [ALARM CHECK] Columns: {list(df.columns)[:10]}")
 
                 id_col_al = next(
                     (c for c in COLUMN_LOOKUP[id_lookup_key] if c in df.columns), None)
                 msg_col_al = next(
                     (c for c in COLUMN_LOOKUP[msg_lookup_key] if c in df.columns), None)
 
-                print(f">>> [ALARM CHECK] Matched ID column: '{id_col_al}'")
-                print(f">>> [ALARM CHECK] Matched MSG column: '{msg_col_al}'")
+                print(flush=True, f">>> [ALARM CHECK] Matched ID column: '{id_col_al}'")
+                print(flush=True, f">>> [ALARM CHECK] Matched MSG column: '{msg_col_al}'")
 
                 if id_col_al and msg_col_al:
                     alarm_count = 0
                     processed_count = 0
 
                     # Show first 3 rows for debugging
-                    print(f">>> [ALARM CHECK] Sample data from {vk.upper()} file (first 3 rows):")
+                    print(flush=True, f">>> [ALARM CHECK] Sample data from {vk.upper()} file (first 3 rows):")
                     for idx, r in df.head(3).iterrows():
                         raw_id = r.get(id_col_al, "")
                         msg = r.get(msg_col_al, "")
-                        print(f"    Row {idx}: ID='{raw_id}', MSG='{msg}'")
+                        print(flush=True, f"    Row {idx}: ID='{raw_id}', MSG='{msg}'")
 
                     # Check what's in the database for this vendor
-                    print(
+                    print(flush=True, 
                         f">>> [ALARM CHECK] SMS-ready sites in DB for {vk.upper()}: {len(data_store['sms_numeric_ids'][vk])}")
                     if len(data_store['sms_numeric_ids'][vk]) > 0:
                         sample_ids = list(data_store['sms_numeric_ids'][vk])[:5]
-                        print(f">>> [ALARM CHECK] Sample IDs from DB: {sample_ids}")
+                        print(flush=True, f">>> [ALARM CHECK] Sample IDs from DB: {sample_ids}")
                     else:
-                        print(f">>> [ALARM CHECK] WARNING: No SMS-ready sites in database for {vk.upper()}!")
+                        print(flush=True, f">>> [ALARM CHECK] WARNING: No SMS-ready sites in database for {vk.upper()}!")
 
                     for _, r in df.iterrows():
                         processed_count += 1
@@ -891,7 +891,7 @@ def index():
                         # Debug first 5 matches
                         if processed_count <= 5:
                             in_db = sid_n in data_store['sms_numeric_ids'][vk]
-                            print(
+                            print(flush=True, 
                                 f"    Processing row {processed_count}: '{raw_id_val}' -> extracted: '{sid_n}' -> in DB: {in_db}")
 
                         if sid_n in data_store["sms_numeric_ids"][vk]:
@@ -900,13 +900,13 @@ def index():
                             data_store['active_alarms'].setdefault(f_id, []).append(msg)
                             alarm_count += 1
 
-                    print(
+                    print(flush=True, 
                         f">>> [ALARM CHECK] ✓ Processed {processed_count} rows, found {alarm_count} matching alarms for {vk.upper()}")
-                    print(
+                    print(flush=True, 
                         f">>> [ALARM CHECK] Total sites in DB for {vk.upper()}: {len(data_store['sms_numeric_ids'][vk])}")
                 else:
-                    print(f">>> [ALARM CHECK] ✗ ERROR: Missing columns for {vk.upper()}!")
-                    print(f">>> [ALARM CHECK] Available columns in file: {list(df.columns)}")
+                    print(flush=True, f">>> [ALARM CHECK] ✗ ERROR: Missing columns for {vk.upper()}!")
+                    print(flush=True, f">>> [ALARM CHECK] Available columns in file: {list(df.columns)}")
 
             # Format only NEW alarms (lists), don't re-format already formatted strings
             for k, v in data_store['active_alarms'].items():
@@ -2085,14 +2085,14 @@ def refresh():
 @app.route('/api/refresh_data', methods=['POST'])
 def api_refresh_data():
     try:
-        print(">>> [API] Refresh requested")
+        print(flush=True, ">>> [API] Refresh requested")
         success = fetch_and_sync_all()
         if success:
             return jsonify({"status": "ok", "msg": "Data refreshed successfully"})
         else:
             return jsonify({"status": "error", "msg": "Failed to refresh data. Check server logs."})
     except Exception as e:
-        print(f">>> [API] Error during refresh: {e}")
+        print(flush=True, f">>> [API] Error during refresh: {e}")
         return jsonify({"status": "error", "msg": str(e)})
 
 
@@ -2210,7 +2210,7 @@ def api_graph_data():
         })
 
     except Exception as e:
-        print(traceback.format_exc())
+        print(flush=True, traceback.format_exc())
         return jsonify({"error": str(e)})
 
 
@@ -2220,10 +2220,10 @@ def clear_alarms():
     try:
         alarm_count = len(data_store.get('active_alarms', {}))
         data_store['active_alarms'] = {}
-        print(f">>> [CLEAR] Cleared {alarm_count} alarm entries")
+        print(flush=True, f">>> [CLEAR] Cleared {alarm_count} alarm entries")
         return {"status": "ok", "msg": f"✓ Cleared {alarm_count} alarm entries"}
     except Exception as e:
-        print(f">>> [CLEAR] Error: {e}")
+        print(flush=True, f">>> [CLEAR] Error: {e}")
         return {"status": "error", "msg": str(e)}
 
 
@@ -2262,20 +2262,20 @@ def dashboard_stats():
         if not data_store.get("full_export_data"):
             return {"error": "No data loaded. Click REFRESH first!"}
 
-        print(f">>> [DASHBOARD] Total records in full_export_data: {len(data_store['full_export_data'])}")
+        print(flush=True, f">>> [DASHBOARD] Total records in full_export_data: {len(data_store['full_export_data'])}")
 
         df = pd.DataFrame(data_store["full_export_data"])
 
         # Debug: show first record structure
         if len(df) > 0:
-            print(f">>> [DASHBOARD] Sample record keys: {list(df.columns)}")
-            print(f">>> [DASHBOARD] First record: {df.iloc[0].to_dict()}")
+            print(flush=True, f">>> [DASHBOARD] Sample record keys: {list(df.columns)}")
+            print(flush=True, f">>> [DASHBOARD] First record: {df.iloc[0].to_dict()}")
 
         # Filter by vendor if specified
         if vendor_filter != 'all':
             df = df[df['Вендор'].str.upper() == vendor_filter.upper()]
 
-        print(f">>> [DASHBOARD] After vendor filter '{vendor_filter}': {len(df)} records")
+        print(flush=True, f">>> [DASHBOARD] After vendor filter '{vendor_filter}': {len(df)} records")
 
         # Calculate stats
         total = len(df)
@@ -2360,7 +2360,7 @@ def dashboard_stats():
             "regions": regions_data
         }
     except Exception as e:
-        print(f">>> [DASHBOARD] Error: {e}")
+        print(flush=True, f">>> [DASHBOARD] Error: {e}")
         traceback.print_exc()
         return {"error": str(e)}
 
@@ -2372,12 +2372,12 @@ def ftp_process_route():
             return {"status": "error",
                     "msg": "Данные с портала еще не загружены. Подождите 10-15 сек и обновите страницу."}
 
-        print(">>> [FTP] Starting background process...")
+        print(flush=True, ">>> [FTP] Starting background process...")
         with open(CONFIG_FILE, "r") as f:
             cfg = json.load(f)
         ftp_cfg = cfg.get('ftp', {})
 
-        print(f">>> [FTP] Connecting to {ftp_cfg.get('host')}...")
+        print(flush=True, f">>> [FTP] Connecting to {ftp_cfg.get('host')}...")
         ftp = ftplib.FTP()
         ftp.connect(ftp_cfg.get('host'), int(ftp_cfg.get('port', 21)))
         ftp.login(ftp_cfg.get('user'), ftp_cfg.get('pass'))
@@ -2390,12 +2390,12 @@ def ftp_process_route():
 
         target = next((f for f in reversed(zips) if 'fm-active' in f.lower()), zips[-1])
 
-        print(f">>> [FTP] Downloading {target}...")
+        print(flush=True, f">>> [FTP] Downloading {target}...")
         bio = BytesIO()
         ftp.retrbinary(f"RETR {target}", bio.write)
         ftp.quit()
         bio.seek(0)
-        print(f">>> [FTP] Downloaded {bio.tell()} bytes. Processing...")
+        print(flush=True, f">>> [FTP] Downloaded {bio.tell()} bytes. Processing...")
 
         data_store['active_alarms'] = {}
         processed_count = 0
@@ -2406,7 +2406,7 @@ def ftp_process_route():
             if not excel_files: return {"status": "error", "msg": "No Excel in ZIP"}
 
             for xls in excel_files:
-                print(f">>> [FTP] Parsing {xls}...")
+                print(flush=True, f">>> [FTP] Parsing {xls}...")
                 with z.open(xls) as f_in:
                     content = f_in.read()
 
@@ -2414,7 +2414,7 @@ def ftp_process_route():
                 try:
                     df_raw = pd.read_excel(BytesIO(content), header=None)
                 except Exception as e:
-                    print(f">>> [FTP] Error reading {xls}: {e}")
+                    print(flush=True, f">>> [FTP] Error reading {xls}: {e}")
                     continue
 
                 for vk in ['huawei', 'zte']:
@@ -2429,7 +2429,7 @@ def ftp_process_route():
                                 break
 
                         if h_idx == -1:
-                            # print(f">>> [FTP] Header not found for {vk} in {xls}")
+                            # print(flush=True, f">>> [FTP] Header not found for {vk} in {xls}")
                             continue
 
                         # Step 2: Re-read with correct header (matches manual logic)
@@ -2446,7 +2446,7 @@ def ftp_process_route():
 
                         if id_col and msg_col:
                             count_for_file = 0
-                            print(f">>> [FTP] Processing {vk} in {xls}. Found cols: {id_col}, {msg_col}")
+                            print(flush=True, f">>> [FTP] Processing {vk} in {xls}. Found cols: {id_col}, {msg_col}")
 
                             for _, r in df.iterrows():
                                 # Use exact ID parsing logic from manual loop
@@ -2460,11 +2460,11 @@ def ftp_process_route():
                                     data_store['active_alarms'].setdefault(fid, []).append(msg)
                                     count_for_file += 1
 
-                            print(f">>> [FTP] Found {count_for_file} alarms for {vk}.")
+                            print(flush=True, f">>> [FTP] Found {count_for_file} alarms for {vk}.")
                             total_alarms_found += count_for_file
                             processed_count += 1
                     except Exception as e:
-                        print(f">>> [FTP] Error processing vendor {vk}: {e}")
+                        print(flush=True, f">>> [FTP] Error processing vendor {vk}: {e}")
                         continue
 
         # Format only NEW alarms (lists), don't re-format already formatted strings
@@ -2472,7 +2472,7 @@ def ftp_process_route():
             if isinstance(v, list):  # Only format if it's still a list
                 data_store['active_alarms'][k] = "<br> • " + "<br> • ".join(list(set(v)))
 
-        print(f">>> [FTP] Done. Total matches: {total_alarms_found}")
+        print(flush=True, f">>> [FTP] Done. Total matches: {total_alarms_found}")
         return {"status": "ok",
                 "msg": f"Processed {target}. Found alarms for {len(data_store['active_alarms'])} sites."}
     except Exception as e:
@@ -2497,7 +2497,7 @@ def offline_excel_check():
         if not data_store.get("sms_numeric_ids") or not any(data_store["sms_numeric_ids"].values()):
             return {"status": "error", "msg": "No initial data. Please click REFRESH first!"}
 
-        print(f">>> [OFFLINE] Processing uploaded file: {file.filename}")
+        print(flush=True, f">>> [OFFLINE] Processing uploaded file: {file.filename}")
 
         # Read Excel file from upload
         excel_content = file.read()
@@ -2544,11 +2544,11 @@ def offline_excel_check():
                         data_store['active_alarms'].setdefault(fid, []).append(msg)
                         count_for_vendor += 1
 
-                print(f">>> [OFFLINE] Found {count_for_vendor} alarms for {vk.upper()}")
+                print(flush=True, f">>> [OFFLINE] Found {count_for_vendor} alarms for {vk.upper()}")
                 total_alarms += count_for_vendor
 
             except Exception as e:
-                print(f">>> [OFFLINE] Error processing {vk}: {e}")
+                print(flush=True, f">>> [OFFLINE] Error processing {vk}: {e}")
                 continue
 
         # Format alarm messages (only NEW alarms in list format)
@@ -2556,7 +2556,7 @@ def offline_excel_check():
             if isinstance(v, list):  # Only format if it's still a list
                 data_store['active_alarms'][k] = "<br> • " + "<br> • ".join(list(set(v)))
 
-        print(f">>> [OFFLINE] Done. Total alarms: {total_alarms}")
+        print(flush=True, f">>> [OFFLINE] Done. Total alarms: {total_alarms}")
 
         return {"status": "ok",
                 "msg": f"Processed '{file.filename}'. Found alarms for {len(data_store['active_alarms'])} sites (total: {total_alarms} alarms)."}
@@ -2588,11 +2588,11 @@ def submit_2fa():
             'RememberMachine': 'false', 'RememberMe': 'false'
         })
 
-        print(f">>> [SMS] Sending code: {code}")
+        print(flush=True, f">>> [SMS] Sending code: {code}")
         res_v = session.post(f"{BASE_URL}/Account/LoginWith2fa?rememberMe=False", data=data_v, verify=False)
 
         if res_v.status_code == 200 and "/Bts" in res_v.url:
-            print(">>> [SMS] Success!")
+            print(flush=True, ">>> [SMS] Success!")
             sys_state['waiting_sms'] = False
             sys_state['session'] = None  # Clear
 
@@ -2610,9 +2610,9 @@ def submit_2fa():
 
 
 if __name__ == '__main__':
-    print(f">>> [SERVER] Запуск сервера на http://0.0.0.0:{PORT}")
-    print(">>> [INFO] Для входа нажмите кнопку ОБНОВИТЬ в браузере")
-    print(">>> [DASHBOARD] Dashboard integrated at /dashboard route")
+    print(flush=True, f">>> [SERVER] Запуск сервера на http://0.0.0.0:{PORT}")
+    print(flush=True, ">>> [INFO] Для входа нажмите кнопку ОБНОВИТЬ в браузере")
+    print(flush=True, ">>> [DASHBOARD] Dashboard integrated at /dashboard route")
 
     # Start main app (dashboard is now integrated, no separate process needed!)
     app.run(host='0.0.0.0', port=PORT, debug=True, use_reloader=False)
